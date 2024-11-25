@@ -1,8 +1,5 @@
-# backend/Dockerfile
-
 FROM python:3.13-slim
 
-# Install build tools
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     gcc \
