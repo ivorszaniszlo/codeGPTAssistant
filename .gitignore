@@ -1,0 +1,58 @@
+# General
+.DS_Store
+Thumbs.db
+
+# Node.js (VSCode ext.)
+extension/node_modules/
+extension/npm-debug.log*
+extension/yarn-debug.log*
+extension/yarn-error.log*
+extension/dist/
+extension/out/
+extension/temp/
+
+# Python (Backend)
+backend/__pycache__/
+backend/*.py[cod]
+backend/env/
+backend/venv/
+backend/.venv/
+backend/ENV/
+backend/env.bak/
+backend/venv.bak/
+backend/.env
+
+# Env
+.env
+*.env
+
+# Log files
+logs/
+*.log
+
+# System files
+.DS_Store
+*.swp
+*~
+
+# IDE
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+
+# Docker
+docker-compose.override.yml
+**/*.pid
+**/*.seed
+**/*.pid.lock
+
+# Test
+coverage/
+coverage_html/
+.pytest_cache/
+htmlcov/
+
+# Other
+*.bak
+*.tmp
