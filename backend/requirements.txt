@@ -4,3 +4,4 @@ langchain
 openai
 pymongo
 python-dotenv
+langchain_community
