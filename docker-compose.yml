@@ -52,6 +52,11 @@ services:
     image: redis:latest
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
     command: redis-server --save 60 1 --loglevel warning
 
 volumes:
