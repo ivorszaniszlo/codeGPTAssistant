@@ -1,6 +1,10 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 from typing import List, Optional
 from app.utils.database import get_database
+from bson.errors import InvalidId
+import logging
+
+logger = logging.getLogger(__name__)
 
 class InteractionModel(BaseModel):
     """
@@ -9,6 +13,12 @@ class InteractionModel(BaseModel):
     prompt: str = Field(..., description="The user's prompt or question.")
     response: str = Field(..., description="The AI-generated response.")
     user_id: Optional[str] = Field(None, description="The user ID, if available.")
+
+    @validator("prompt")
+    def validate_prompt(cls, value):
+        if len(value) > 5000:
+            raise ValueError("Prompt length exceeds 5000 characters.")
+        return value
 
 class InteractionDatabase:
     """
@@ -22,8 +32,15 @@ class InteractionDatabase:
             uri (str): The MongoDB connection URI.
             db_name (str): The name of the database to connect to.
         """
-        self.db = get_database()[db_name]
-        self.collection = self.db["interactions"]
+        try:
+            self.db = get_database()[db_name]
+            self.collection = self.db["interactions"]
+
+            # Ensure the user_id field has an index for faster queries
+            self.collection.create_index("user_id", sparse=True)
+        except Exception as e:
+            logger.error("Failed to initialize database: %s", str(e))
+            raise RuntimeError("Database initialization failed.")
 
     def save_interaction(self, interaction: InteractionModel) -> None:
         """
@@ -32,10 +49,13 @@ class InteractionDatabase:
         Args:
             interaction (InteractionModel): The interaction data to store.
         """
-        # Convert the Pydantic model to a dictionary and insert it into the database
-        self.collection.insert_one(interaction.dict(exclude_unset=True))
+        try:
+            self.collection.insert_one(interaction.dict(exclude_unset=True))
+        except Exception as e:
+            logger.error("Failed to save interaction: %s", str(e))
+            raise RuntimeError("Failed to save interaction.")
 
-    def get_interactions(self, user_id: Optional[str] = None) -> List[dict]:
+    def get_interactions(self, user_id: Optional[str] = None) -> List[InteractionModel]:
         """
         Retrieve interactions from the database.
 
@@ -43,10 +63,16 @@ class InteractionDatabase:
             user_id (Optional[str]): The ID of the user whose interactions are to be retrieved.
 
         Returns:
-            List[dict]: A list of interaction records.
+            List[InteractionModel]: A list of interaction records.
         """
-        # Build the query to filter by user_id, if provided
-        query = {"user_id": user_id} if user_id else {}
+        try:
+            query = {"user_id": user_id} if user_id else {}
+            records = list(self.collection.find(query, {"_id": 0}))
 
-        # Retrieve and return the interactions, excluding the MongoDB "_id" field
-        return list(self.collection.find(query, {"_id": 0}))
+            return [InteractionModel(**record) for record in records]
+        except InvalidId as e:
+            logger.error("Invalid user ID provided: %s", str(e))
+            raise ValueError("Invalid user ID format.")
+        except Exception as e:
+            logger.error("Failed to retrieve interactions: %s", str(e))
+            raise RuntimeError("Failed to retrieve interactions.")
