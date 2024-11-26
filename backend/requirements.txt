@@ -5,3 +5,6 @@ langchain-openai
 openai
 pymongo
 python-dotenv
+elasticsearch
+redis
+
