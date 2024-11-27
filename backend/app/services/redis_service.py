@@ -14,8 +14,7 @@ class RedisService:
     """
     A service class to interact with the Redis database.
     """
-
-    _instance = None  # Singleton instance
+    _instance: Optional["RedisService"] = None  # Singleton instance
 
     def __new__(cls, *args, **kwargs):
         """
@@ -39,7 +38,7 @@ class RedisService:
             try:
                 self.client = redis.Redis(host=host, port=port, db=db, decode_responses=decode_responses)
                 self.client.ping()  # Test the connection
-                logger.info("Successfully connected to Redis.")
+                logger.info(f"Successfully connected to Redis at {host}:{port}.")
             except Exception as e:
                 logger.error(f"Failed to connect to Redis: {e}")
                 raise RuntimeError("Redis initialization failed.")
@@ -56,7 +55,10 @@ class RedisService:
         """
         try:
             value = self.client.get(key)
-            logger.info(f"Retrieved value for key '{key}': {value}")
+            if value is not None:
+                logger.info(f"Retrieved value for key '{key}'.")
+            else:
+                logger.warning(f"Key '{key}' does not exist in Redis.")
             return value
         except Exception as e:
             logger.error(f"Error retrieving key '{key}' from Redis: {e}")
@@ -90,7 +92,7 @@ class RedisService:
             key (str): The key to delete.
 
         Returns:
-            bool: True if the key was deleted, False otherwise.
+            bool: True if the key was deleted successfully, False otherwise.
         """
         try:
             result = self.client.delete(key)
@@ -125,7 +127,9 @@ def get_redis_service() -> RedisService:
     Returns a singleton instance of RedisService.
     """
     try:
-        return RedisService(host="redis", port=6379)  # Adjust host/port as per your setup
+        redis_host = "localhost"  # Adjust host as necessary
+        redis_port = 6379        # Adjust port as necessary
+        return RedisService(host=redis_host, port=redis_port)
     except RuntimeError as e:
         logger.error(f"Could not initialize RedisService: {e}")
         raise

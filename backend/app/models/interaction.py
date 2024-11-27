@@ -2,11 +2,23 @@ from pydantic import BaseModel, Field, field_validator
 from typing import List, Optional
 from app.utils.database import get_database
 from app.utils.elasticsearch import get_elasticsearch_client
-from app.utils.redis import get_redis_client
-from bson.errors import InvalidId
+from app.services.redis_service import RedisService
+from app.constants import (
+    ELASTICSEARCH_INDEX_NAME,
+    MONGODB_COLLECTION_NAME,
+    CACHE_EXPIRATION_SECONDS
+)
 import logging
+import os
+from bson.errors import InvalidId
 
 logger = logging.getLogger(__name__)
+
+# Environment variables
+MONGO_URI = os.getenv("MONGODB_URI")
+REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
+REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
+ELASTICSEARCH_URI = os.getenv("ELASTICSEARCH_URI", "http://localhost:9200")
 
 
 class InteractionModel(BaseModel):
@@ -30,19 +42,21 @@ class InteractionDatabase:
     """
     Handles database interactions for storing and retrieving user prompts and responses.
     """
-    def __init__(self, uri: str, db_name: str = "codegpt"):
+    def __init__(self):
         """
-        Initializes the database connection.
-
-        Args:
-            uri (str): The MongoDB connection URI.
-            db_name (str): The name of the database to connect to.
+        Initializes the database connection and external services.
         """
         try:
-            self.db = get_database()[db_name]
+            self.db_client = get_database(MONGO_URI)
+            self.db = self.db_client[MONGODB_COLLECTION_NAME]
             self.collection = self.db["interactions"]
-            self.elasticsearch = get_elasticsearch_client()
-            self.redis = get_redis_client()
+
+            # Initialize Elasticsearch
+            self.elasticsearch = get_elasticsearch_client(ELASTICSEARCH_URI)
+
+            # Initialize Redis
+            self.redis_service = RedisService(host=REDIS_HOST, port=REDIS_PORT)
+            self.redis = self.redis_service.client
 
             # Ensure indexes for efficient queries
             self.collection.create_index("user_id", sparse=True)
@@ -67,7 +81,7 @@ class InteractionDatabase:
             # Save to Elasticsearch
             if self.elasticsearch:
                 self.elasticsearch.index(
-                    index="qa_pairs",
+                    index=ELASTICSEARCH_INDEX_NAME,
                     document=interaction.dict(exclude_unset=True),
                 )
                 logger.info("Interaction indexed in Elasticsearch successfully.")
@@ -75,7 +89,7 @@ class InteractionDatabase:
             # Save to Redis
             if self.redis:
                 redis_key = f"interaction:{interaction.prompt}"
-                self.redis.set(redis_key, interaction.response, ex=3600)  # 1-hour TTL
+                self.redis.set(redis_key, interaction.response, ex=CACHE_EXPIRATION_SECONDS)
                 logger.info("Interaction cached in Redis successfully.")
         except Exception as e:
             logger.error("Failed to save interaction: %s", str(e))
@@ -96,7 +110,7 @@ class InteractionDatabase:
             if query and self.elasticsearch:
                 # Search in Elasticsearch
                 search_results = self.elasticsearch.search(
-                    index="qa_pairs",
+                    index=ELASTICSEARCH_INDEX_NAME,
                     query={"match": {"prompt": query}},
                 )
                 interactions = [

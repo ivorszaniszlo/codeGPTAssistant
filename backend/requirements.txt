@@ -7,4 +7,3 @@ pymongo
 python-dotenv
 elasticsearch
 redis
-

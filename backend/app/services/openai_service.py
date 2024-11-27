@@ -1,6 +1,8 @@
 from langchain_openai import ChatOpenAI
-from app.services.redis_service import get_redis_service
+from app.services.redis_service import RedisService
 import logging
+import os
+from typing import Optional
 
 # Setup logger
 logger = logging.getLogger("openai_service")
@@ -9,24 +11,48 @@ handler = logging.StreamHandler()
 handler.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
 logger.addHandler(handler)
 
-# Initialize Redis service
-try:
-    redis_service = get_redis_service()
-except Exception as e:
-    logger.error(f"Failed to initialize RedisService: {e}")
-    redis_service = None
-
 class OpenAIService:
-    def __init__(self, api_key: str, model: str = "gpt-4o-mini"):
+    """
+    A service for interacting with OpenAI's chat models.
+    """
+
+    def __init__(self, api_key: Optional[str] = None, model: Optional[str] = None, redis_service: Optional[RedisService] = None):
         """
-        Initializes the OpenAIService with the provided API key and chat model.
+        Initializes the OpenAIService with the provided API key, chat model, and Redis service.
 
         Args:
-            api_key (str): The API key for OpenAI.
-            model (str): The chat model name to use (default is "gpt-4o-mini").
+            api_key (Optional[str]): The API key for OpenAI. If not provided, it will be loaded from the environment variable `OPENAI_API_KEY`.
+            model (Optional[str]): The chat model name to use. Defaults to `gpt-4o-mini`.
+            redis_service (Optional[RedisService]): An optional RedisService instance for caching responses.
         """
-        self.llm = ChatOpenAI(api_key=api_key, model=model)
-        logger.info(f"OpenAIService initialized with model: {model}")
+        self.api_key = api_key or os.getenv("OPENAI_API_KEY")
+        if not self.api_key:
+            logger.error("OpenAI API key is not provided.")
+            raise ValueError("OpenAI API key is required.")
+
+        self.model = model or "gpt-4o-mini"
+        self.llm = ChatOpenAI(api_key=self.api_key, model=self.model)
+        self.redis_service = redis_service or self._initialize_redis()
+
+        logger.info(f"OpenAIService initialized with model: {self.model}")
+
+    @staticmethod
+    def _initialize_redis() -> Optional[RedisService]:
+        """
+        Initializes the Redis service using environment variables.
+
+        Returns:
+            RedisService: The initialized Redis service, or None if initialization fails.
+        """
+        try:
+            redis_host = os.getenv("REDIS_HOST", "localhost")
+            redis_port = int(os.getenv("REDIS_PORT", 6379))
+            redis_service = RedisService(host=redis_host, port=redis_port)
+            logger.info("RedisService initialized successfully.")
+            return redis_service
+        except Exception as e:
+            logger.error(f"Failed to initialize RedisService: {e}")
+            return None
 
     def generate_response(self, prompt: str) -> str:
         """
@@ -45,10 +71,10 @@ class OpenAIService:
             logger.info(f"Generating response for prompt: {prompt}")
 
             # Check Redis cache
-            if redis_service:
-                cached_response = redis_service.get(prompt)
+            if self.redis_service:
+                cached_response = self.redis_service.get(prompt)
                 if cached_response:
-                    logger.info("Cache hit - returning cached response.")
+                    logger.info("Cache hit: Returning cached response.")
                     return cached_response
             else:
                 logger.warning("RedisService is not initialized. Skipping cache check.")
@@ -56,31 +82,23 @@ class OpenAIService:
             # Send the prompt to the chat model
             response = self.llm.invoke([{"role": "user", "content": prompt}])
 
-            # Handle structured response types
+            # Extract content from response
             if hasattr(response, "content"):
                 message_content = response.content
-                logger.info(f"Response generated successfully.")
-
-                # Cache the response in Redis
-                if redis_service:
-                    redis_service.set(prompt, message_content, ex=3600)  # Cache for 1 hour
-                    logger.info("Response cached in Redis.")
-                
-                return message_content
             elif isinstance(response, list) and response:
-                # Handle list of messages
                 message_content = response[0].get("content", "")
-                logger.info(f"Response generated successfully (from list).")
-
-                # Cache the response in Redis
-                if redis_service:
-                    redis_service.set(prompt, message_content, ex=3600)
-                    logger.info("Response cached in Redis.")
-
-                return message_content
             else:
                 logger.error(f"Unexpected response format: {response}")
-                raise Exception("Unexpected response format received from ChatOpenAI.")
+                raise ValueError("Unexpected response format received from ChatOpenAI.")
+
+            logger.info("Response generated successfully.")
+
+            # Cache the response in Redis
+            if self.redis_service:
+                self.redis_service.set(prompt, message_content, ex=3600)  # Cache for 1 hour
+                logger.info("Response cached in Redis.")
+
+            return message_content
         except Exception as e:
             logger.error(f"Error in generate_response: {str(e)}", exc_info=True)
-            raise Exception(f"An error occurred while generating the response: {str(e)}")
+            raise RuntimeError(f"An error occurred while generating the response: {str(e)}")
