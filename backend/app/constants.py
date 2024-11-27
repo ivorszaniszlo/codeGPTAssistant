@@ -13,7 +13,7 @@ MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
 
 # Elasticsearch configuration
 ELASTICSEARCH_INDEX_NAME = os.getenv("ELASTICSEARCH_INDEX_NAME", "qa_pairs")
-ELASTICSEARCH_URI = os.getenv("ELASTICSEARCH_URI", "http://localhost:9200")
+ELASTICSEARCH_URI = os.getenv("ELASTICSEARCH_URI", "http://172.18.0.2:9200")
 
 # Logging configuration
 LOGGING_FORMAT = os.getenv(
