@@ -103,25 +103,26 @@ class ElasticsearchService:
 
     def delete_document(self, index: str, doc_id: str) -> bool:
         """
-        Deletes a document from Elasticsearch by ID.
+        Deletes a document from the specified Elasticsearch index.
 
         Args:
             index (str): The name of the Elasticsearch index.
             doc_id (str): The ID of the document to delete.
 
         Returns:
-            bool: True if the document was deleted successfully, False otherwise.
+            bool: True if the document was deleted, False otherwise.
         """
         try:
             response = self.client.delete(index=index, id=doc_id)
-            logger.info(f"Document {doc_id} deleted successfully from {index}.")
-            return True
-        except exceptions.NotFoundError:
-            logger.warning(f"Document {doc_id} not found in {index}.")
-            return False
+            if response["result"] == "deleted":
+                logger.info(f"Document {doc_id} deleted successfully from {index}.")
+                return True
+            elif response["result"] == "not_found":
+                logger.warning(f"Document {doc_id} not found in {index}.")
+                return False
         except Exception as e:
             logger.error(f"Failed to delete document {doc_id} from {index}: {e}")
-            return False
+            raise
 
     def create_index(self, index: str, mappings: Optional[Dict[str, Any]] = None) -> bool:
         """
@@ -135,16 +136,15 @@ class ElasticsearchService:
             bool: True if the index was created successfully, False otherwise.
         """
         try:
-            if self.client.indices.exists(index=index):
-                logger.info(f"Index {index} already exists.")
+            if not self.client.indices.exists(index=index):
+                print("DEBUG: Calling indices.create")  # Debug
+                self.client.indices.create(index=index, body={"mappings": mappings})
                 return True
-
-            response = self.client.indices.create(index=index, body={"mappings": mappings} if mappings else {})
-            logger.info(f"Index {index} created successfully: {response}")
-            return True
+            else:
+                return False
         except Exception as e:
             logger.error(f"Failed to create index {index}: {e}")
-            return False
+            raise
 
     def delete_index(self, index: str) -> bool:
         """

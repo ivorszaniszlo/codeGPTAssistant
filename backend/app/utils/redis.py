@@ -83,3 +83,27 @@ def get_redis_client() -> Optional[redis.Redis]:
     except RuntimeError as e:
         logger.error(f"Could not initialize Redis client: {e}")
         return None
+
+def redis_set_key(client, key: str, value: str) -> bool:
+    try:
+        client.set(key, value)
+        return True
+    except Exception as e:
+        logger.error(f"Failed to set key {key} in Redis: {e}")
+        return False
+
+
+def redis_get_key(client, key: str) -> Optional[str]:
+    try:
+        return client.get(key)
+    except Exception as e:
+        logger.error(f"Failed to get key {key} from Redis: {e}")
+        return None
+
+
+def redis_delete_key(client, key: str) -> bool:
+    try:
+        return client.delete(key) > 0
+    except Exception as e:
+        logger.error(f"Failed to delete key {key} from Redis: {e}")
+        return False

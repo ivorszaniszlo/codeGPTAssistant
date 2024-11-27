@@ -7,6 +7,7 @@ from app.services.redis_service import RedisService
 from app.services.openai_service import OpenAIService
 from app.constants import MONGODB_COLLECTION_NAME
 from app.controllers.interaction_controller import router as interaction_router
+from dotenv import load_dotenv
 
 import logging
 
