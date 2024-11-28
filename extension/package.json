@@ -15,12 +15,20 @@
   ],
   "main": "./dist/extension.js",
   "contributes": {
-    "commands": [
-      {
-        "command": "codegpt-assistant.askGPT",
-        "title": "Ask CodeGPT"
-      }
-    ]
+      "commands": [
+          {
+              "command": "codegpt-assistant.askGPT",
+              "title": "Ask CodeGPT"
+          },
+          {
+              "command": "codegpt-assistant.analyzeFile",
+              "title": "Analyze Active File"
+          },
+          {
+              "command": "codegpt-assistant.analyzeSelection",
+              "title": "Analyze Selected Text"
+          }
+      ]
   },
   "scripts": {
     "vscode:prepublish": "npm run package",
