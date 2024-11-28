@@ -50,9 +50,14 @@ docker-compose.override.yml
 # Test
 coverage/
 coverage_html/
-.pytest_cache/
 htmlcov/
 
 # Other
 *.bak
 *.tmp
+
+# Ignore Python cache files
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
